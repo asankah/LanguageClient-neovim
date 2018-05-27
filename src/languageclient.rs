@@ -2313,10 +2313,10 @@ impl State {
         let params: CqueryProgressParams = params.clone().to_lsp()?;
         let total = params.indexRequestCount + params.doIdMapCount + params.loadPreviousIndexCount
             + params.onIdMappedCount + params.onIndexedCount;
-        if total != 0 {
+        if total != 0 && params.indexRequestCount != 0 {
             self.command(&format!(
-                "let {}=1 | let {}='cquery: indexing ({} jobs)'",
-                VIM__ServerStatus, VIM__ServerStatusMessage, params.indexRequestCount
+                "let {}=1 | let {}='cquery: indexing ({} jobs of {})'",
+                VIM__ServerStatus, VIM__ServerStatusMessage, params.indexRequestCount, total
             ))?;
         } else {
             self.command(&format!(

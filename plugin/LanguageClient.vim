@@ -74,6 +74,10 @@ function! LanguageClient_complete(...)
     return call('LanguageClient#complete', a:000)
 endfunction
 
+function! LanguageClient_onCompleteDone()
+    call LanguageClient#onCompleteDone()
+endfunction
+
 function! LanguageClient_serverStatus(...)
     return call('LanguageClient#serverStatus', a:000)
 endfunction

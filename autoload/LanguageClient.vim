@@ -66,6 +66,29 @@ function! s:hasSnippetSupport() abort
     return 0
 endfunction
 
+function! LanguageClient#onCompleteDone()
+  if !exists('v:completed_item') || !has_key(v:completed_item, 'user_data')
+    return
+  endif
+
+  let l:d = json_decode(v:completed_item.user_data)
+
+  if !has_key(l:d, 'snippet') || !has_key(l:d, 'snippet_trigger')
+    return
+  endif
+
+  " https://github.com/SirVer/ultisnips
+  if exists('g:did_plugin_ultisnips')
+    call UltiSnips#Anon(l:d['snippet'], l:d['snippet_trigger'], '', 'i')
+    return
+  endif
+  " https://github.com/Shougo/neosnippet.vim
+  if exists('g:loaded_neosnippet')
+    call neosnippet#complete_done()
+    return
+  endif
+endfunction
+
 function! s:IsTrue(v) abort
     if type(a:v) ==# type(0)
         return a:v ==# 0 ? v:false : v:true

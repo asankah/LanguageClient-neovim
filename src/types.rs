@@ -428,6 +428,14 @@ pub struct NCMRefreshParams {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct VimCompleteItemUserData {
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub snippet: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub snippet_trigger: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct VimCompleteItem {
     pub word: String,
     pub icase: u64,
@@ -439,42 +447,54 @@ pub struct VimCompleteItem {
     #[serde(rename = "additionalTextEdits")]
     pub additional_text_edits: Option<Vec<lsp::TextEdit>>,
     #[serde(skip_serializing_if = "String::is_empty")]
-    pub snippet: String,
+    pub user_data: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_snippet: Option<bool>,
 }
 
+fn uptoFirstSnippet(s: &str) -> &str {
+    let b = s.as_bytes();
+    let mut last = b'?';
+    for (i, &ch) in b.iter().enumerate() {
+        if ch == b'$' && last != b'\\' {
+            return &s[..i]
+        }
+        last = ch
+    }
+    &s[..]
+}
+
 impl From<CompletionItem> for VimCompleteItem {
     fn from(lspitem: CompletionItem) -> VimCompleteItem {
-        let mut abbr = lspitem.label.clone();
+        let abbr = lspitem.label.clone();
         let word = lspitem
             // Try use textEdit.
             .text_edit
             .clone()
-            .map(|edit| {
-                // EXTREMELY HACKY.
-                abbr = "".into();
-                edit.new_text.split_whitespace().last().unwrap_or(&edit.new_text)
-                    .trim_left_matches(|c| !char::is_alphanumeric(c))
-                    .into()
-            })
+            .map(|edit| edit.new_text)
             // Or else insertText.
             .or_else(|| lspitem.insert_text.clone())
             // Or else label.
             .unwrap_or_else(|| lspitem.label.clone());
 
         let is_snippet;
-        let snippet;
+        let insertion;
+        let user_data;
         if lspitem.insert_text_format == Some(InsertTextFormat::Snippet) {
             is_snippet = Some(true);
-            snippet = word.clone();
+            insertion = String::from(uptoFirstSnippet(&word));
+            user_data = serde_json::to_string(&json!({
+                "snippet": word.clone(),
+                "snippet_trigger": insertion.clone(),
+            })).unwrap_or_else(|_| String::default());
         } else {
             is_snippet = None;
-            snippet = String::default();
+            insertion = word.clone();
+            user_data = String::from("");
         };
 
         VimCompleteItem {
-            word,
+            word: insertion,
             abbr,
             icase: 1,
             dup: 1,
@@ -485,7 +505,7 @@ impl From<CompletionItem> for VimCompleteItem {
                 .unwrap_or_default(),
             kind: lspitem.kind.map(|k| format!("{:?}", k)).unwrap_or_default(),
             additional_text_edits: lspitem.additional_text_edits.clone(),
-            snippet,
+            user_data,
             is_snippet,
         }
     }
